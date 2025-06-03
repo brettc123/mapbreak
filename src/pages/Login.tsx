@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSupabase } from '../hooks/useSupabase';
+import { Browser } from '@capacitor/browser';
+import { App } from '@capacitor/app';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -28,7 +30,7 @@ export default function Login() {
       
       console.log('OAuth redirect URL:', redirectTo);
       
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: { 
           redirectTo: redirectTo
@@ -36,6 +38,13 @@ export default function Login() {
       });
       
       if (error) throw error;
+      
+      // For mobile, show instructions
+      if (window.Capacitor?.isNative) {
+        setError(`Opening ${provider} login... After completing login, please return to the MapBreak app.`);
+        setLoading(false);
+      }
+      
     } catch (err: any) {
       setError(`Failed to sign in with ${provider}. Please try again.`);
       setLoading(false);
@@ -251,6 +260,21 @@ export default function Login() {
         </p>
       </div>
 
+      {/* Mobile Instructions */}
+      {window.Capacitor?.isNative && (
+        <div style={{
+          marginTop: '20px',
+          padding: '15px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '8px',
+          fontSize: '14px',
+          color: '#1976d2',
+          textAlign: 'center'
+        }}>
+          📱 <strong>Mobile Tip:</strong> After completing Google/Facebook login in the browser, return to this app and you'll be automatically signed in!
+        </div>
+      )}
+
       {/* Debug Info */}
       <div style={{
         marginTop: '40px',
@@ -264,6 +288,7 @@ export default function Login() {
         <br />Loading: {loading ? 'Yes' : 'No'}
         <br />Error: {error || 'None'}
         <br />Email: {email || 'Empty'}
+        <br />User: {user ? 'Authenticated' : 'Not authenticated'}
         <br />Current URL: {window.location.href}
       </div>
     </div>
