@@ -1,16 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSupabase } from '../hooks/useSupabase';
-import { Browser } from '@capacitor/browser';
-import { App } from '@capacitor/app';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { supabase } = useSupabase();
+  const { supabase, user } = useSupabase();
   const navigate = useNavigate();
+
+  // Auto-redirect if user becomes authenticated
+  useEffect(() => {
+    if (user) {
+      console.log('User is now authenticated, redirecting to settings...');
+      navigate('/settings');
+    }
+  }, [user, navigate]);
 
   const handleOAuthLogin = async (provider: 'google' | 'facebook' | 'apple') => {
     setLoading(true);
@@ -30,7 +36,7 @@ export default function Login() {
       
       console.log('OAuth redirect URL:', redirectTo);
       
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: { 
           redirectTo: redirectTo
@@ -41,7 +47,7 @@ export default function Login() {
       
       // For mobile, show instructions
       if (window.Capacitor?.isNative) {
-        setError(`Opening ${provider} login... After completing login, please return to the MapBreak app.`);
+        setError(`Opening ${provider} login... After completing login, please return to the MapBreak app and you'll be automatically signed in!`);
         setLoading(false);
       }
       
@@ -288,7 +294,7 @@ export default function Login() {
         <br />Loading: {loading ? 'Yes' : 'No'}
         <br />Error: {error || 'None'}
         <br />Email: {email || 'Empty'}
-        <br />User: {user ? 'Authenticated' : 'Not authenticated'}
+        <br />User: {user ? 'Authenticated ✅' : 'Not authenticated'}
         <br />Current URL: {window.location.href}
       </div>
     </div>
