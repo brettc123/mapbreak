@@ -414,7 +414,7 @@ export default function Login() {
           color: '#0369a1',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '20px', marginBottom: '8px' }}>📱</div>
+          <div style={{ fontSize: '19px', marginBottom: '8px' }}>📱</div>
           <strong>Mobile Login:</strong>
           <br />
           After OAuth completes, switch back to MapBreak and you'll be automatically signed in!
