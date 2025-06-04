@@ -1945,4 +1945,4 @@ function SharedMapHandler() {
 }
 
 // Keep your original export statement to avoid build errors
-export { AppWrapper };
+export { AppWrapper };// Force rebuild
