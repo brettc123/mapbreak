@@ -14,7 +14,7 @@ export default function Login() {
   useEffect(() => {
     if (user) {
       console.log('User is now authenticated, redirecting to settings...');
-      navigate('/settings');
+      navigate('/');
     }
   }, [user, navigate]);
 
@@ -25,7 +25,7 @@ export default function Login() {
       
       if (event === 'SIGNED_IN' && session) {
         console.log('User signed in successfully, redirecting...');
-        navigate('/settings');
+        navigate('/');
       }
     });
 
