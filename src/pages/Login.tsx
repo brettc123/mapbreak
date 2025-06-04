@@ -14,7 +14,7 @@ export default function Login() {
   useEffect(() => {
     if (user) {
       console.log('User is now authenticated, redirecting to settings...');
-      navigate('/');
+      navigate('/settings');
     }
   }, [user, navigate]);
 
@@ -25,7 +25,7 @@ export default function Login() {
       
       if (event === 'SIGNED_IN' && session) {
         console.log('User signed in successfully, redirecting...');
-        navigate('/');
+        navigate('/settings');
       }
     });
 
@@ -414,7 +414,7 @@ export default function Login() {
           color: '#0369a1',
           textAlign: 'center'
         }}>
-          <div style={{ fontSize: '19px', marginBottom: '8px' }}>📱</div>
+          <div style={{ fontSize: '20px', marginBottom: '8px' }}>📱</div>
           <strong>Mobile Login:</strong>
           <br />
           After OAuth completes, switch back to MapBreak and you'll be automatically signed in!

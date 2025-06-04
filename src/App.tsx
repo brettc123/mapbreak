@@ -1874,6 +1874,7 @@ function AppRoutes() {
       <Route path="/success" element={<Success />} />
       <Route path="/cancel" element={<Cancel />} />
       <Route path="/account" element={<AccountDetails />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="/settings/language" element={<LanguageSettings />} />
       <Route path="/settings/notifications" element={<NotificationSettings />} />
       <Route path="/settings/legal" element={<Legal />} />
