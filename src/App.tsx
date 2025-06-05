@@ -1659,7 +1659,7 @@ const doFavorite = () => {
                 {mapHeaderText}
               </h2>
             </div>
-            <MapCard
+           <MapCard
   map={currentMap}
   handleCoordinatesClick={() => window.open(`https://www.google.com/maps?q=${currentMap.coordinates.latitude},${currentMap.coordinates.longitude}`,'_blank')}
   handleShare={doShare}
@@ -1668,7 +1668,7 @@ const doFavorite = () => {
   handleTagClick={onTagClick}
   favoriteMapIds={favoriteMapIds}
   isSubscribed={isSubscribed}
-  isAuthenticated={!!user}  // Add this prop
+  isAuthenticated={!!user}  // ← ADD THIS LINE
   isScrolled={isScrolled}
   shareMessage={shareMessage}
 />
