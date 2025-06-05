@@ -244,3 +244,10 @@ img {
 /* Text size utilities */
 .text-default { font-size: 1rem; }
 .text-large   { font-size: 1.125rem; }
+
+/* TEMPORARY MOBILE TAILWIND FIX */
+@media screen {
+  @import 'tailwindcss/base';
+  @import 'tailwindcss/components';  
+  @import 'tailwindcss/utilities';
+}
