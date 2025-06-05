@@ -1,4 +1,4 @@
-import { X, Check, Star, Map, Globe } from 'lucide-react';
+import { X, Check, Star, Map, Zap, Heart } from 'lucide-react';
 import { useStripe } from '../hooks/useStripe';
 import { useState } from 'react';
 import { useSupabase } from '../hooks/useSupabase';
@@ -10,44 +10,37 @@ interface PaywallModalProps {
   trigger?: 'favorites' | 'search' | 'general';
 }
 
-// Add your actual Stripe price IDs here
-const SUBSCRIPTION_PLANS = {
-  pro: {
-    id: 'pro',
-    name: 'Explorer Pro',
+// Simplified pricing with monthly/yearly options
+const PRICING_CONFIG = {
+  monthly: {
     price: 4.99,
     interval: 'month',
-    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ID_PRO || 'price_pro_monthly',
-    features: [
-      'Unlimited favorite maps',
-      'Sync across all devices',
-      'Priority customer support',
-      'Early access to new features',
-      'Ad-free experience'
-    ],
-    popular: true
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ID_MONTHLY || 'price_monthly',
+    popular: false,
   },
-  premium: {
-    id: 'premium', 
-    name: 'Explorer Premium',
-    price: 9.99,
-    interval: 'month',
-    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ID_PREMIUM || 'price_premium_monthly',
-    features: [
-      'Everything in Pro',
-      'Offline map downloads',
-      'Custom map collections',
-      'Advanced search filters',
-      'Export map data',
-      'Premium map themes'
-    ]
+  yearly: {
+    price: 49.99, // $4.16/month = 16% savings
+    interval: 'year',
+    stripePriceId: import.meta.env.VITE_STRIPE_PRICE_ID_YEARLY || 'price_yearly',
+    popular: true,
+    savings: 'Save 16%',
+    monthlyEquivalent: 4.16,
   }
 };
+
+const FEATURES = [
+  'Unlimited favorite maps',
+  'Unlimited daily searches', 
+  'Sync across all devices',
+  'Ad-free experience',
+  'Priority customer support',
+  'Early access to new features'
+];
 
 export default function PaywallModal({ isOpen, onClose, trigger = 'general' }: PaywallModalProps) {
   const { createCheckoutSession, isLoading } = useStripe();
   const [error, setError] = useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'premium'>('pro');
+  const [selectedInterval, setSelectedInterval] = useState<'monthly' | 'yearly'>('yearly'); // Default to yearly
   const { supabase } = useSupabase();
   const navigate = useNavigate();
 
@@ -58,28 +51,32 @@ export default function PaywallModal({ isOpen, onClose, trigger = 'general' }: P
     switch (trigger) {
       case 'favorites':
         return {
+          icon: <Heart className="h-8 w-8 text-red-500" />,
           title: 'Unlock Unlimited Favorites',
           description: 'Save as many maps as you want and access them anywhere!',
-          urgency: "You've reached your free favorite limit"
+          urgency: "You've reached your free favorite limit (10 maps)"
         };
       case 'search':
         return {
+          icon: <Zap className="h-8 w-8 text-blue-500" />,
           title: 'Search Without Limits',
           description: 'Get unlimited searches and discover amazing places!',
-          urgency: "You've reached your daily search limit"
+          urgency: "You've reached your daily search limit (5 searches)"
         };
       default:
         return {
-          title: 'Unlock All Premium Features',
-          description: 'Take your map exploration to the next level!',
+          icon: <Star className="h-8 w-8 text-yellow-500" />,
+          title: 'Unlock MapBreak Pro',
+          description: 'Get unlimited access to all premium features!',
           urgency: 'Upgrade to access premium features'
         };
     }
   };
 
   const triggerContent = getTriggerContent();
+  const selectedPricing = PRICING_CONFIG[selectedInterval];
 
-  const handleSubscribe = async (planId: 'pro' | 'premium') => {
+  const handleSubscribe = async () => {
     try {
       setError(null);
       
@@ -94,16 +91,14 @@ export default function PaywallModal({ isOpen, onClose, trigger = 'general' }: P
         return;
       }
 
-      const plan = SUBSCRIPTION_PLANS[planId];
-      
-      if (!plan.stripePriceId) {
+      if (!selectedPricing.stripePriceId) {
         setError('Subscription not configured. Please contact support.');
-        console.error(`Stripe price ID not found for plan: ${planId}`);
+        console.error(`Stripe price ID not found for: ${selectedInterval}`);
         return;
       }
 
       await createCheckoutSession({
-        priceId: plan.stripePriceId,
+        priceId: selectedPricing.stripePriceId,
         mode: 'subscription',
       });
       
@@ -115,24 +110,29 @@ export default function PaywallModal({ isOpen, onClose, trigger = 'general' }: P
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
-        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-slate dark:text-white">
-              {triggerContent.title}
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              {triggerContent.description}
-            </p>
+        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              {triggerContent.icon}
+              <div className="ml-3">
+                <h3 className="text-xl font-bold text-slate dark:text-white">
+                  {triggerContent.title}
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm">
+                  {triggerContent.description}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            <X className="h-6 w-6" />
-          </button>
         </div>
 
         {/* Urgency Banner */}
@@ -142,80 +142,81 @@ export default function PaywallModal({ isOpen, onClose, trigger = 'general' }: P
           </p>
         </div>
 
-        {/* Plan Selection */}
         <div className="p-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            {Object.entries(SUBSCRIPTION_PLANS).map(([key, plan]) => (
-              <div
-                key={key}
-                className={`relative border-2 rounded-xl p-6 cursor-pointer transition-all ${
-                  selectedPlan === key
-                    ? 'border-terra bg-terra/5'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-terra/50'
-                } ${plan.popular ? 'ring-2 ring-terra ring-opacity-50' : ''}`}
-                onClick={() => setSelectedPlan(key as 'pro' | 'premium')}
+          {/* Pricing Toggle */}
+          <div className="mb-6">
+            <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 text-center">
+              Choose Your Plan
+            </h4>
+            
+            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-xl p-1 mb-6">
+              <button
+                onClick={() => setSelectedInterval('monthly')}
+                className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${
+                  selectedInterval === 'monthly'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
               >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-terra text-white px-3 py-1 rounded-full text-sm font-medium">
-                      Most Popular
-                    </span>
-                  </div>
+                Monthly
+              </button>
+              <button
+                onClick={() => setSelectedInterval('yearly')}
+                className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all relative ${
+                  selectedInterval === 'yearly'
+                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                }`}
+              >
+                Yearly
+                {PRICING_CONFIG.yearly.savings && (
+                  <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full font-medium">
+                    {PRICING_CONFIG.yearly.savings}
+                  </span>
                 )}
+              </button>
+            </div>
 
-                {/* Plan Header */}
-                <div className="text-center mb-6">
-                  <div className="inline-flex items-center justify-center w-12 h-12 bg-terra/10 rounded-lg mb-3">
-                    {key === 'pro' ? (
-                      <Map className="w-6 h-6 text-terra" />
-                    ) : (
-                      <Globe className="w-6 h-6 text-terra" />
-                    )}
-                  </div>
-                  <h4 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {plan.name}
-                  </h4>
-                  <div className="mt-2">
-                    <span className="text-3xl font-bold text-gray-900 dark:text-white">
-                      ${plan.price}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400">
-                      /{plan.interval}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Features */}
-                <ul className="space-y-3 mb-6">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center">
-                      <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
-                      <span className="text-gray-700 dark:text-gray-300 text-sm">
-                        {feature}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Selection Indicator */}
-                <div className="flex items-center justify-center">
-                  <div className={`w-4 h-4 rounded-full border-2 ${
-                    selectedPlan === key
-                      ? 'bg-terra border-terra'
-                      : 'border-gray-300 dark:border-gray-600'
-                  }`}>
-                    {selectedPlan === key && (
-                      <div className="w-full h-full rounded-full bg-white transform scale-50"></div>
-                    )}
-                  </div>
-                </div>
+            {/* Pricing Display */}
+            <div className="text-center mb-6 p-6 bg-gradient-to-br from-terra/5 to-compass-100/5 dark:from-terra/10 dark:to-compass-700/10 rounded-xl border border-terra/20">
+              <div className="text-4xl font-bold text-gray-900 dark:text-white">
+                ${selectedPricing.price}
+                <span className="text-xl font-normal text-gray-600 dark:text-gray-400">
+                  /{selectedPricing.interval}
+                </span>
               </div>
-            ))}
+              
+              {selectedInterval === 'yearly' && (
+                <div className="mt-2 space-y-1">
+                  <div className="text-green-600 dark:text-green-400 font-medium">
+                    {PRICING_CONFIG.yearly.savings} • Only ${PRICING_CONFIG.yearly.monthlyEquivalent}/month
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    vs ${PRICING_CONFIG.monthly.price}/month if paid monthly
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Features List */}
+          <div className="mb-8">
+            <h5 className="font-semibold text-gray-900 dark:text-white mb-4">
+              Everything included:
+            </h5>
+            <div className="space-y-3">
+              {FEATURES.map((feature, index) => (
+                <div key={index} className="flex items-center">
+                  <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
+                  <span className="text-gray-700 dark:text-gray-300">{feature}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Error Display */}
           {error && (
-            <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-700 rounded-lg">
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/50 border border-red-200 dark:border-red-700 rounded-lg">
               <div className="flex items-start">
                 <span className="text-red-500 mr-2 flex-shrink-0">⚠️</span>
                 <span className="text-red-700 dark:text-red-400 text-sm">{error}</span>
@@ -224,7 +225,7 @@ export default function PaywallModal({ isOpen, onClose, trigger = 'general' }: P
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-4 mt-8">
+          <div className="flex gap-3">
             <button
               onClick={onClose}
               className="flex-1 py-3 px-4 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -232,7 +233,7 @@ export default function PaywallModal({ isOpen, onClose, trigger = 'general' }: P
               Maybe Later
             </button>
             <button
-              onClick={() => handleSubscribe(selectedPlan)}
+              onClick={handleSubscribe}
               disabled={isLoading}
               className="flex-2 py-3 px-6 bg-terra text-white rounded-lg hover:bg-terra/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
             >
@@ -242,17 +243,17 @@ export default function PaywallModal({ isOpen, onClose, trigger = 'general' }: P
                   Processing...
                 </div>
               ) : (
-                `Subscribe to ${SUBSCRIPTION_PLANS[selectedPlan].name}`
+                `Start Pro ${selectedInterval === 'yearly' ? 'Yearly' : 'Monthly'}`
               )}
             </button>
           </div>
 
           {/* Footer */}
-          <div className="text-center mt-6">
+          <div className="text-center mt-6 space-y-2">
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Cancel anytime. No commitment required.
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               By subscribing, you agree to our Terms of Service and Privacy Policy.
             </p>
           </div>

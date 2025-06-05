@@ -1,5 +1,5 @@
 // hooks/useSubscription.ts
-// Updated to work with your existing table structure
+// Simplified for monthly/yearly pricing
 
 import { useState, useEffect } from 'react';
 import { useSupabase } from './useSupabase';
@@ -39,21 +39,19 @@ export function useSubscription() {
         setLoading(true);
         setError(null);
 
-        // Query your stripe_subscriptions table with user_id
         const { data, error } = await supabase
           .from('stripe_subscriptions')
           .select('*')
           .eq('user_id', user.id)
-          .in('subscription_status', ['active', 'trialing']) // Only get active subscriptions
+          .in('subscription_status', ['active', 'trialing'])
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        if (error && error.code !== 'PGRST116') {
           console.error('Error fetching subscription:', error);
           setError(error.message);
         } else if (mounted) {
-          // If no active subscription found, create a "free" subscription object
           if (!data) {
             setSubscription({
               id: 'free',
@@ -79,7 +77,7 @@ export function useSubscription() {
 
     fetchSubscription();
 
-    // Set up real-time subscription to changes
+    // Real-time subscription changes
     const subscriptionChannel = supabase
       .channel('subscription-changes')
       .on(
@@ -94,7 +92,6 @@ export function useSubscription() {
           console.log('Subscription changed:', payload);
           
           if (payload.eventType === 'DELETE') {
-            // If subscription deleted, set to free
             setSubscription({
               id: 'free',
               user_id: user?.id || '',
@@ -103,7 +100,6 @@ export function useSubscription() {
             });
           } else if (payload.new) {
             const newSubscription = payload.new as Subscription;
-            // Only update if it's an active subscription
             if (['active', 'trialing'].includes(newSubscription.subscription_status)) {
               setSubscription(newSubscription);
             }
@@ -125,26 +121,25 @@ export function useSubscription() {
   const isCanceled = subscription?.subscription_status === 'canceled';
   const isFree = subscription?.subscription_status === 'free' || !subscription;
 
-  // Determine subscription tier
-  const getSubscriptionTier = () => {
-    if (!subscription || subscription.subscription_status === 'free') {
-      return 'free';
-    }
+  // Determine if it's yearly or monthly (for display purposes)
+  const getSubscriptionInterval = () => {
+    if (!subscription?.stripe_price_id) return null;
     
-    // You can determine tier based on price_id if needed
-    if (subscription.stripe_price_id === process.env.VITE_STRIPE_PRICE_ID_PRO) {
-      return 'pro';
-    }
+    const monthlyPriceId = import.meta.env.VITE_STRIPE_PRICE_ID_MONTHLY;
+    const yearlyPriceId = import.meta.env.VITE_STRIPE_PRICE_ID_YEARLY;
     
-    if (subscription.stripe_price_id === process.env.VITE_STRIPE_PRICE_ID_PREMIUM) {
-      return 'premium';
-    }
+    if (subscription.stripe_price_id === yearlyPriceId) return 'yearly';
+    if (subscription.stripe_price_id === monthlyPriceId) return 'monthly';
     
-    // Default to pro for any paid subscription
-    return isSubscribed || isTrialing ? 'pro' : 'free';
+    return 'monthly'; // Default fallback
   };
 
-  // Get subscription limits based on tier
+  // Simplified: only two tiers - free vs pro (both monthly and yearly are "pro")
+  const getSubscriptionTier = () => {
+    return (isSubscribed || isTrialing) ? 'pro' : 'free';
+  };
+
+  // Get subscription limits - same for both monthly and yearly
   const getSubscriptionLimits = () => {
     const tier = getSubscriptionTier();
     
@@ -161,16 +156,9 @@ export function useSubscription() {
         canDownload: true,
         hasAds: false,
       },
-      premium: {
-        dailySearches: Infinity,
-        maxFavorites: Infinity,
-        canDownload: true,
-        hasAds: false,
-        advancedFeatures: true,
-      },
     };
 
-    return limits[tier] || limits.free;
+    return limits[tier];
   };
 
   return {
@@ -188,6 +176,7 @@ export function useSubscription() {
     // Helper functions
     getSubscriptionTier,
     getSubscriptionLimits,
+    getSubscriptionInterval,
     
     // Convenience boolean
     hasActiveSubscription: isSubscribed || isTrialing,

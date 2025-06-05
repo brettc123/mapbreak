@@ -52,10 +52,6 @@ const SUBSCRIPTION_LIMITS = {
   pro: {
     dailySearches: Infinity,
     maxFavorites: Infinity
-  },
-  premium: {
-    dailySearches: Infinity,
-    maxFavorites: Infinity
   }
 };
 
@@ -1034,19 +1030,19 @@ function Home() {
   const [favoritesCount, setFavoritesCount] = useState(0)
 
   // Subscription limits check function
-  const checkSubscriptionLimits = (action: 'search' | 'favorite', currentCount: number) => {
-    const userTier = isSubscribed ? 'pro' : 'free';
-    const limits = SUBSCRIPTION_LIMITS[userTier];
-    
-    switch (action) {
-      case 'search':
-        return currentCount < limits.dailySearches;
-      case 'favorite':
-        return currentCount < limits.maxFavorites;
-      default:
-        return true;
-    }
-  };
+const checkSubscriptionLimits = (action: 'search' | 'favorite', currentCount: number) => {
+  const userTier = isSubscribed ? 'pro' : 'free';
+  const limits = SUBSCRIPTION_LIMITS[userTier];
+  
+  switch (action) {
+    case 'search':
+      return currentCount < limits.dailySearches;
+    case 'favorite':
+      return currentCount < limits.maxFavorites;
+    default:
+      return true;
+  }
+};
 
   // Load daily search count from localStorage
   useEffect(() => {
