@@ -43,6 +43,22 @@ import { useTheme } from './contexts/ThemeContext'
 
 import './index.css' // tailwind + safe‐area CSS
 
+// Subscription limits configuration
+const SUBSCRIPTION_LIMITS = {
+  free: {
+    dailySearches: 5,
+    maxFavorites: 10
+  },
+  pro: {
+    dailySearches: Infinity,
+    maxFavorites: Infinity
+  },
+  premium: {
+    dailySearches: Infinity,
+    maxFavorites: Infinity
+  }
+};
+
 // — Rich‐text options with enhanced map syntax support —
 const richTextOptions = {
   renderNode: {
@@ -208,7 +224,7 @@ function MapCard({
 >
   <Heart
   className={`h-6 w-6 transition-all duration-200 ${
-  (isAuthenticated && isSubscribed && favoriteMapIds.includes(map.id))
+  (isAuthenticated && favoriteMapIds.includes(map.id))
     ? 'fill-red-500 text-red-500 scale-110'
     : 'text-compass-800 dark:text-white hover:text-red-400'
 } active:text-white`}
@@ -333,7 +349,17 @@ function MapCard({
 }
 
 // — Search screen —
-function SearchScreen({ searchQuery, handleSearch, searchResults, archiveMaps, onCardClick, onTagClick, isLoading }: any) {
+function SearchScreen({ 
+  searchQuery, 
+  handleSearch, 
+  searchResults, 
+  archiveMaps, 
+  onCardClick, 
+  onTagClick, 
+  isLoading,
+  dailySearchCount,
+  searchLimit 
+}: any) {
   const contentRef = useRef<HTMLDivElement>(null);
   
   // Force scroll to top on mount and when tab changes
@@ -371,6 +397,21 @@ function SearchScreen({ searchQuery, handleSearch, searchResults, archiveMaps, o
             />
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-compass-400" />
           </div>
+          
+          {/* Usage indicator */}
+          {searchLimit !== Infinity && (
+            <div className="text-center mt-2">
+              <span className={`text-xs ${
+                dailySearchCount >= searchLimit 
+                  ? 'text-red-600 dark:text-red-400' 
+                  : dailySearchCount >= searchLimit * 0.8 
+                  ? 'text-orange-600 dark:text-orange-400'
+                  : 'text-gray-500 dark:text-gray-400'
+              }`}>
+                {dailySearchCount}/{searchLimit} daily searches used
+              </span>
+            </div>
+          )}
         </div>
       </div>
       
@@ -948,6 +989,11 @@ function Home() {
     setCurrentMap,
     searchResults,
     isLoading,
+    getDailyUsage,
+    canPerformAction,
+    getSubscriptionLimits,
+    addFavoriteToDB,
+    removeFavoriteFromDB,
   } = useMapData()
 
     useEffect(() => {
@@ -959,7 +1005,7 @@ function Home() {
     });
   }, []);
 
-  const { user } = useSupabase()
+  const { user, supabase } = useSupabase()
   const { subscription } = useSubscription()
   const { darkMode } = useTheme()
   //const { showBanner, showInterstitial } = useAds()
@@ -974,15 +1020,141 @@ function Home() {
   
   const navigate = useNavigate()
 
+  // Enhanced state for subscription features
   const [activeTab, setActiveTab] = useState<'maps'|'search'|'explore'|'favorites'|'settings'|'tag'>('maps')
   const [isScrolled, setIsScrolled] = useState(false)
   const [showPaywall, setShowPaywall] = useState(false)
+  const [paywallTrigger, setPaywallTrigger] = useState<'favorites' | 'search' | 'general'>('general')
   const [shareMessage, setShareMessage] = useState('')
   const [currentTag, setCurrentTag] = useState<string>('')
   const [previousTab, setPreviousTab] = useState<'maps'|'search'|'explore'|'favorites'|'settings'>('maps')
   const [previousMap, setPreviousMap] = useState<any>(null)
-  // Add this state to track navigation source
-  const [navigationSource, setNavigationSource] = useState<'tab-click' | 'map-selection' | null>(null);
+  const [navigationSource, setNavigationSource] = useState<'tab-click' | 'map-selection' | null>(null)
+  const [dailySearchCount, setDailySearchCount] = useState(0)
+  const [favoritesCount, setFavoritesCount] = useState(0)
+
+  // Subscription limits check function
+  const checkSubscriptionLimits = (action: 'search' | 'favorite', currentCount: number) => {
+    const userTier = isSubscribed ? 'pro' : 'free';
+    const limits = SUBSCRIPTION_LIMITS[userTier];
+    
+    switch (action) {
+      case 'search':
+        return currentCount < limits.dailySearches;
+      case 'favorite':
+        return currentCount < limits.maxFavorites;
+      default:
+        return true;
+    }
+  };
+
+  // Load daily search count from localStorage
+  useEffect(() => {
+    const loadDailySearchCount = () => {
+      const today = new Date().toDateString();
+      const lastSearchDate = localStorage.getItem('lastSearchDate');
+      const storedCount = parseInt(localStorage.getItem('dailySearchCount') || '0');
+      
+      if (lastSearchDate === today) {
+        setDailySearchCount(storedCount);
+      } else {
+        // New day, reset count
+        setDailySearchCount(0);
+        localStorage.setItem('dailySearchCount', '0');
+        localStorage.setItem('lastSearchDate', today);
+      }
+    };
+    
+    loadDailySearchCount();
+  }, []);
+
+  // Track favorites count
+  useEffect(() => {
+    setFavoritesCount(favoriteMapIds.length);
+  }, [favoriteMapIds]);
+
+  // Enhanced handleSearch function with limits
+  const handleSearchWithLimits = async (query: string) => {
+    // Check if user has reached search limit
+    if (!checkSubscriptionLimits('search', dailySearchCount)) {
+      setPaywallTrigger('search');
+      setShowPaywall(true);
+      return;
+    }
+
+    try {
+      // Call your existing handleSearch function
+      await handleSearch(query);
+      
+      // Increment search count only for actual searches (not empty queries)
+      if (query.trim()) {
+        const newCount = dailySearchCount + 1;
+        setDailySearchCount(newCount);
+        localStorage.setItem('dailySearchCount', newCount.toString());
+        localStorage.setItem('lastSearchDate', new Date().toDateString());
+      }
+      
+    } catch (error) {
+      console.error('Search error:', error);
+    }
+  };
+
+  // Enhanced doFavorite function with database persistence
+  const doFavoriteWithPersistence = async () => {
+    console.log('❤️ Heart button clicked!');
+    
+    if (!currentMap) {
+      console.log('❌ No current map to favorite');
+      showShare('No map to favorite');
+      return;
+    }
+    
+    // Auth check
+    if (!user) {
+      console.log('❌ User not authenticated, redirecting to login');
+      showShare('Please sign in to favorite maps');
+      setTimeout(() => navigate('/login'), 1500);
+      return;
+    }
+    
+    const isCurrentlyFavorited = favoriteMapIds.includes(currentMap.id);
+    
+    // Check limits only when adding (not removing)
+    if (!isCurrentlyFavorited && !checkSubscriptionLimits('favorite', favoritesCount)) {
+      setPaywallTrigger('favorites');
+      setShowPaywall(true);
+      return;
+    }
+
+    try {
+      // Haptic feedback
+      if (window.Capacitor?.isNative) {
+        await Haptics.impact({ style: ImpactStyle.Light });
+      }
+
+      // Make sure current map is available to favorites screen
+      if (window.__mapTracker && currentMap) {
+        window.__mapTracker.mapsById[currentMap.id] = currentMap;
+        window.__mapTracker.allSeen = Object.values(window.__mapTracker.mapsById);
+        console.log('✅ Added current map to global tracker');
+      }
+      
+      // Call the enhanced toggleFavorite function (which handles database operations)
+      await toggleFavorite(currentMap.id);
+      
+      // Show feedback based on current state
+      if (isCurrentlyFavorited) {
+        showShare('💔 Removed from favorites');
+      } else {
+        showShare('❤️ Added to favorites!');
+      }
+      
+    } catch (error) {
+      console.error('Favorite error:', error);
+      showShare('❌ Error updating favorites');
+    }
+  };
+
 useEffect(() => {
   if (process.env.NODE_ENV === 'development') {
     console.log('Push notification debug info:', {
@@ -994,6 +1166,7 @@ useEffect(() => {
     });
   }
 }, [token, permissionStatus, notifications, user]);
+
   // INTEGRATION: Initialize push notifications on app start
   useEffect(() => {
     const initializePushNotifications = async () => {
@@ -1443,6 +1616,7 @@ const doShare = async () => {
     } catch (e) {}
   }
 };
+
 const doRandom = async () => {
   console.log('🎲 Random button clicked!')
   
@@ -1492,74 +1666,6 @@ const doRandom = async () => {
       }
     } catch (e) {}
   }
-};
-const doFavorite = () => {
-  console.log('❤️ Heart button clicked!');
-  console.log('Current map:', currentMap?.name, 'ID:', currentMap?.id);
-  console.log('Current favoriteMapIds:', favoriteMapIds);
-  console.log('User:', !!user);
-  console.log('Subscribed:', isSubscribed);
-  
-  if (!currentMap) {
-    console.log('❌ No current map to favorite');
-    showShare('No map to favorite');
-    return;
-  }
-  
-  // PROPER AUTH ENFORCEMENT - NO BYPASSING
-  if (!user) {
-    console.log('❌ User not authenticated, redirecting to login');
-    showShare('Please sign in to favorite maps');
-    setTimeout(() => navigate('/login'), 1500);
-    return;
-  }
-  
-  //if (!isSubscribed) {
-  //console.log('❌ User not subscribed, showing paywall');
-  //showShare('Subscription required for favorites');
-  //setTimeout(() => setShowPaywall(true), 1500);
-  //return;
-  //}
-  
-  console.log('✅ Processing favorite for map:', currentMap.id);
-  
-  // Add haptic feedback
-  try {
-    if (window.Capacitor?.isNative) {
-      Haptics.impact({ style: ImpactStyle.Light });
-    }
-  } catch (e) {
-    console.log('Haptics not available');
-  }
-  
-  // Check current state before toggle
-  const wasAlreadyFavorited = favoriteMapIds.includes(currentMap.id);
-  console.log('Was already favorited:', wasAlreadyFavorited);
-  
-  // CRITICAL: Make sure current map is available to favorites screen
-  if (window.__mapTracker && currentMap) {
-    window.__mapTracker.mapsById[currentMap.id] = currentMap;
-    window.__mapTracker.allSeen = Object.values(window.__mapTracker.mapsById);
-    console.log('✅ Added current map to global tracker');
-  }
-  
-  // Call the toggle function
-  console.log('Calling toggleFavorite...');
-  toggleFavorite(currentMap.id);
-  
-  // Show feedback based on what action we just performed
-  if (wasAlreadyFavorited) {
-    showShare('💔 Removed from favorites');
-    console.log('💔 Removed from favorites');
-  } else {
-    showShare('❤️ Added to favorites!');
-    console.log('❤️ Added to favorites!');
-  }
-  
-  // Debug the state after toggle (with a small delay to see the update)
-  setTimeout(() => {
-    console.log('Updated favoriteMapIds after toggle:', favoriteMapIds);
-  }, 100);
 };
   
   // UPDATED: Add navigation source tracking
@@ -1664,11 +1770,11 @@ const doFavorite = () => {
   handleCoordinatesClick={() => window.open(`https://www.google.com/maps?q=${currentMap.coordinates.latitude},${currentMap.coordinates.longitude}`,'_blank')}
   handleShare={doShare}
   handleRandomMap={doRandom}
-  handleFavoriteClick={doFavorite}
+  handleFavoriteClick={doFavoriteWithPersistence}
   handleTagClick={onTagClick}
   favoriteMapIds={favoriteMapIds}
   isSubscribed={isSubscribed}
-  isAuthenticated={!!user}  // ← ADD THIS LINE
+  isAuthenticated={!!user}
   isScrolled={isScrolled}
   shareMessage={shareMessage}
 />
@@ -1678,12 +1784,14 @@ const doFavorite = () => {
         return (
           <SearchScreen
             searchQuery={searchQuery}
-            handleSearch={handleSearch}
+            handleSearch={handleSearchWithLimits}
             searchResults={searchResults}
             archiveMaps={archiveMaps}
             onCardClick={onSearchSelect}
             onTagClick={onTagClick}
             isLoading={isLoading}
+            dailySearchCount={dailySearchCount}
+            searchLimit={SUBSCRIPTION_LIMITS[isSubscribed ? 'pro' : 'free'].dailySearches}
           />
         )
       case 'explore':
@@ -1739,7 +1847,10 @@ const doFavorite = () => {
               Upgrade to Premium to save and access your favorite maps.
             </p>
             <button
-              onClick={() => setShowPaywall(true)}
+              onClick={() => {
+                setPaywallTrigger('favorites');
+                setShowPaywall(true);
+              }}
               className="px-6 py-3 bg-terra text-white rounded-lg font-semibold hover:bg-terra/90 transition-colors"
             >
               Upgrade to Premium
@@ -1856,7 +1967,11 @@ const doFavorite = () => {
         </nav>
       )}
 
-      <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} />
+      <PaywallModal 
+        isOpen={showPaywall} 
+        onClose={() => setShowPaywall(false)}
+        trigger={paywallTrigger}
+      />
     </div>
   )
 }
@@ -1990,4 +2105,4 @@ function SharedMapHandler() {
 }
 
 // Keep your original export statement to avoid build errors
-export { AppWrapper };// Force rebuild
+export { AppWrapper };
