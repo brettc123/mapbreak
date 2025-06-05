@@ -1,7 +1,7 @@
 // src/pages/Signup.tsx - Improved version of your current signup
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSupabase } from '../hooks/useSupabase';
 import { Mail, Lock, AlertCircle, X, Apple, CheckCircle } from 'lucide-react';
 
@@ -14,15 +14,16 @@ export default function Signup() {
   const [success, setSuccess] = useState(false);
   const { supabase, user } = useSupabase();
   const navigate = useNavigate();
+  const location = useLocation();
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // Auto-redirect if user becomes authenticated
   useEffect(() => {
-    if (user) {
-      console.log('User is now authenticated, redirecting to settings...');
-      navigate('/settings');
-    }
-  }, [user, navigate]);
+  if (user && location.pathname === '/signup') {
+    console.log('User is now authenticated, redirecting to settings...');
+    navigate('/settings');
+  }
+}, [user, navigate, location.pathname]);
 
   // Listen for auth state changes
   useEffect(() => {

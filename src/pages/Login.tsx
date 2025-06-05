@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSupabase } from '../hooks/useSupabase';
 
 export default function Login() {
@@ -9,14 +9,15 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const { supabase, user } = useSupabase();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Auto-redirect if user becomes authenticated
   useEffect(() => {
-    if (user) {
-      console.log('User is now authenticated, redirecting to settings...');
-      navigate('/settings');
-    }
-  }, [user, navigate]);
+  if (user && location.pathname === '/login') {
+    console.log('User is now authenticated, redirecting to settings...');
+    navigate('/settings');
+  }
+}, [user, navigate, location.pathname]);
 
   // Listen for auth state changes
   useEffect(() => {
