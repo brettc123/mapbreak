@@ -1,16 +1,31 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSupabase } from '../hooks/useSupabase';
-import { Mail, Lock, AlertCircle, X, Apple, Info, ExternalLink } from 'lucide-react';
+import { Mail, Lock, AlertCircle, X, Apple, Info, Loader2 } from 'lucide-react';
+
+// Declare Google Identity Services types
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: any) => void;
+          prompt: () => void;
+          renderButton: (element: Element, config: any) => void;
+          disableAutoSelect: () => void;
+        };
+      };
+    };
+  }
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingAccount, setCheckingAccount] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [oauthAttempted, setOauthAttempted] = useState(false);
-  const [showOAuthConfirm, setShowOAuthConfirm] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<'google' | 'facebook' | 'apple' | null>(null);
   const { supabase, user } = useSupabase();
   const navigate = useNavigate();
   const location = useLocation();
@@ -23,6 +38,21 @@ export default function Login() {
       navigate('/settings');
     }
   }, [user, navigate, location.pathname]);
+
+  // Load Google Identity Services
+  useEffect(() => {
+    const loadGoogleScript = () => {
+      if (window.google) return; // Already loaded
+
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    };
+
+    loadGoogleScript();
+  }, []);
 
   // Check for failed OAuth attempts when component loads
   useEffect(() => {
@@ -67,24 +97,92 @@ export default function Login() {
     }
   }, [user]);
 
-  // STEP 1: Show confirmation modal instead of immediately starting OAuth
-  const handleOAuthRequest = (provider: 'google' | 'facebook' | 'apple') => {
-    setSelectedProvider(provider);
-    setShowOAuthConfirm(true);
-    setError(null);
+  // Check if email exists in database
+  const checkEmailExists = async (email: string): Promise<boolean> => {
+    try {
+      // Query the auth.users table to see if email exists
+      const { data, error } = await supabase
+        .from('auth.users')
+        .select('email')
+        .eq('email', email)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking email:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (err) {
+      console.error('Error checking email:', err);
+      return false;
+    }
   };
 
-  // STEP 2: Actually perform OAuth after confirmation
-  const handleOAuthConfirmed = async () => {
-    if (!selectedProvider) return;
-    
-    setShowOAuthConfirm(false);
-    setLoading(true);
+  // Handle Google sign-in with pre-check
+  const handleGoogleSignIn = async () => {
+    if (!window.google) {
+      setError('Google Sign-In not loaded. Please refresh and try again.');
+      return;
+    }
+
+    setCheckingAccount(true);
     setError(null);
+
+    try {
+      // Use Google Identity Services to get user info without full OAuth
+      window.google.accounts.id.initialize({
+        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID, // You'll need to add this
+        callback: async (response: any) => {
+          try {
+            // Decode the JWT token to get user info
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            const userEmail = payload.email;
+
+            console.log('Checking if email exists:', userEmail);
+
+            // Check if this email exists in our database
+            const emailExists = await checkEmailExists(userEmail);
+
+            if (!emailExists) {
+              setCheckingAccount(false);
+              setError(
+                `No MapBreak account found for ${userEmail}. You'll need to sign up first to create a MapBreak account.`
+              );
+              return;
+            }
+
+            // Email exists! Proceed with full OAuth
+            console.log('Email exists, proceeding with OAuth...');
+            await proceedWithOAuth('google');
+
+          } catch (err) {
+            console.error('Error processing Google response:', err);
+            setCheckingAccount(false);
+            setError('Failed to verify account. Please try again.');
+          }
+        },
+        auto_select: false,
+      });
+
+      // Prompt for sign-in (this just gets the email, doesn't create a session)
+      window.google.accounts.id.prompt();
+
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+      setCheckingAccount(false);
+      setError('Failed to start Google sign-in. Please try again.');
+    }
+  };
+
+  // Proceed with actual OAuth after email verification
+  const proceedWithOAuth = async (provider: 'google' | 'facebook' | 'apple') => {
+    setLoading(true);
+    setCheckingAccount(false);
     
     // Track that we're attempting OAuth login
     localStorage.setItem('oauth_attempt', JSON.stringify({
-      provider: selectedProvider,
+      provider,
       timestamp: Date.now(),
       page: 'login'
     }));
@@ -100,7 +198,7 @@ export default function Login() {
       console.log('OAuth redirect URL:', redirectTo);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: selectedProvider,
+        provider,
         options: { 
           redirectTo: redirectTo,
           queryParams: {
@@ -111,25 +209,32 @@ export default function Login() {
       });
       
       if (error) {
-        localStorage.removeItem('oauth_attempt'); // Clean up on error
+        localStorage.removeItem('oauth_attempt');
         console.error('OAuth error:', error);
-        setError(`Failed to sign in with ${selectedProvider}. Please try again.`);
+        setError(`Failed to sign in with ${provider}. Please try again.`);
         setLoading(false);
         return;
       }
       
       // For mobile, show instructions
       if (window.Capacitor?.isNative) {
-        setError(`✅ ${selectedProvider} sign-in opened! After completing, switch back to MapBreak.`);
+        setError(`✅ ${provider} sign-in opened! After completing, switch back to MapBreak.`);
         setLoading(false);
       }
       
     } catch (err: any) {
-      localStorage.removeItem('oauth_attempt'); // Clean up on error
+      localStorage.removeItem('oauth_attempt');
       console.error('OAuth error:', err);
-      setError(`Failed to sign in with ${selectedProvider}. Please try again.`);
+      setError(`Failed to sign in with ${provider}. Please try again.`);
       setLoading(false);
     }
+  };
+
+  // Handle other OAuth providers (Facebook, Apple) - these don't have easy pre-check
+  const handleOtherOAuth = async (provider: 'facebook' | 'apple') => {
+    // For now, these proceed directly to OAuth
+    // You could implement similar pre-checks for Facebook/Apple if needed
+    await proceedWithOAuth(provider);
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -210,22 +315,31 @@ export default function Login() {
 
           <div className="mt-6 space-y-4">
             <button
-              onClick={() => handleOAuthRequest('google')}
-              disabled={loading}
+              onClick={handleGoogleSignIn}
+              disabled={loading || checkingAccount}
               className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
-              <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Sign in with Google
+              {checkingAccount ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Checking account...
+                </>
+              ) : (
+                <>
+                  <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                  </svg>
+                  Sign in with Google
+                </>
+              )}
             </button>
 
             <button
-              onClick={() => handleOAuthRequest('facebook')}
-              disabled={loading}
+              onClick={() => handleOtherOAuth('facebook')}
+              disabled={loading || checkingAccount}
               className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
               <svg className="h-5 w-5 mr-2" fill="#1877F2" viewBox="0 0 24 24">
@@ -236,8 +350,8 @@ export default function Login() {
 
             {isIOS && (
               <button
-                onClick={() => handleOAuthRequest('apple')}
-                disabled={loading}
+                onClick={() => handleOtherOAuth('apple')}
+                disabled={loading || checkingAccount}
                 className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
               >
                 <Apple className="h-5 w-5 mr-2" />
@@ -321,7 +435,7 @@ export default function Login() {
               <div>
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || checkingAccount}
                   className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-indigo-500 dark:hover:bg-indigo-600"
                 >
                   {loading ? 'Signing in...' : 'Sign in'}
@@ -343,51 +457,6 @@ export default function Login() {
           </div>
         </div>
       </div>
-
-      {/* OAuth Confirmation Modal */}
-      {showOAuthConfirm && selectedProvider && (
-        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
-            <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/20 mb-4">
-                <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                Existing Account Required
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-                You can only sign in with {selectedProvider} if you already have a MapBreak account linked to that {selectedProvider} account.
-                <br /><br />
-                <strong>If this is your first time:</strong> Please create an account first using the Sign Up page.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowOAuthConfirm(false);
-                    setSelectedProvider(null);
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => navigate('/signup')}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Sign Up Instead
-                </button>
-                <button
-                  onClick={handleOAuthConfirmed}
-                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 flex items-center justify-center"
-                >
-                  <ExternalLink className="h-4 w-4 mr-1" />
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
