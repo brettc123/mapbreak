@@ -134,6 +134,7 @@ function MapCard({
   handleTagClick, // Tag click handler prop
   favoriteMapIds,
   isSubscribed,
+  isAuthenticated,
   isScrolled,
   shareMessage,
 }: any) {
@@ -207,11 +208,10 @@ function MapCard({
 >
   <Heart
   className={`h-6 w-6 transition-all duration-200 ${
-    // Only show filled heart if user is authenticated, subscribed, AND map is favorited
-    (isAuthenticated && isSubscribed && favoriteMapIds.includes(map.id))
-      ? 'fill-red-500 text-red-500 scale-110' 
-      : 'text-compass-800 dark:text-white hover:text-red-400'
-  } active:text-white`}
+  (isAuthenticated && isSubscribed && favoriteMapIds.includes(map.id))
+    ? 'fill-red-500 text-red-500 scale-110'
+    : 'text-compass-800 dark:text-white hover:text-red-400'
+} active:text-white`}
 />
 </button>
             </div>
