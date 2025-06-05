@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSupabase } from '../hooks/useSupabase';
@@ -14,12 +15,14 @@ import {
   ScrollText,
   Moon,
   Sun,
-  HelpCircle
+  HelpCircle,
+  LogOut, // ADD THIS IMPORT
+  Shield
 } from 'lucide-react';
 import PaywallModal from './PaywallModal';
 
 export default function SettingsPage() {
-  const { supabase, user } = useSupabase();
+  const { supabase, user, logout } = useSupabase(); // ADD logout here
   const { subscription } = useSubscription();
   const { darkMode, toggleDarkMode } = useTheme();
   const { textSize, setTextSize } = useTextSize();
@@ -29,6 +32,26 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const navigate = useNavigate();
+
+  // ADD THIS: Logout handler
+  const handleLogout = async () => {
+    try {
+      setLoading(true);
+      await logout();
+      setMessage({ type: 'success', text: 'Successfully signed out' });
+      
+      // Navigate to home after a brief delay
+      setTimeout(() => {
+        navigate('/');
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Logout error:', error);
+      setMessage({ type: 'error', text: 'Failed to sign out. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRateApp = () => {
     if (window.location.href.includes('ios')) {
@@ -88,6 +111,25 @@ export default function SettingsPage() {
             <ChevronRight className="h-5 w-5 text-gray-400" />
           </button>
         </div>
+
+        {/* ADD THIS: Logout Section - only show if user is logged in */}
+        {user && (
+          <div className="p-4">
+            <button
+              onClick={handleLogout}
+              disabled={loading}
+              className="w-full flex items-center justify-between text-left disabled:opacity-50"
+            >
+              <div className="flex items-center">
+                <LogOut className="h-5 w-5 text-red-500 mr-3" />
+                <span className="text-slate dark:text-white font-medium">
+                  {loading ? 'Signing out...' : 'Sign Out'}
+                </span>
+              </div>
+              <ChevronRight className="h-5 w-5 text-gray-400" />
+            </button>
+          </div>
+        )}
 
         {/* Language */}
         <div className="p-4">
