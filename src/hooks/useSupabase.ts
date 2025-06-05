@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { createClient, User, Session } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -11,7 +11,7 @@ type SupabaseContextType = {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  logout: () => Promise<void>; // Add logout function that SettingsPage needs
+  logout: () => Promise<void>;
 };
 
 const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined);
@@ -82,7 +82,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     user,
     session,
     loading,
-    logout, // Provide logout function that SettingsPage expects
+    logout,
   };
 
   return (
