@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSupabase } from '../hooks/useSupabase';
-import { Mail, Lock, AlertCircle, X, Apple, Info } from 'lucide-react';
+import { Mail, Lock, AlertCircle, X, Apple, Info, ExternalLink } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -9,6 +9,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [oauthAttempted, setOauthAttempted] = useState(false);
+  const [showOAuthConfirm, setShowOAuthConfirm] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<'google' | 'facebook' | 'apple' | null>(null);
   const { supabase, user } = useSupabase();
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,13 +67,24 @@ export default function Login() {
     }
   }, [user]);
 
-  const handleOAuthLogin = async (provider: 'google' | 'facebook' | 'apple') => {
+  // STEP 1: Show confirmation modal instead of immediately starting OAuth
+  const handleOAuthRequest = (provider: 'google' | 'facebook' | 'apple') => {
+    setSelectedProvider(provider);
+    setShowOAuthConfirm(true);
+    setError(null);
+  };
+
+  // STEP 2: Actually perform OAuth after confirmation
+  const handleOAuthConfirmed = async () => {
+    if (!selectedProvider) return;
+    
+    setShowOAuthConfirm(false);
     setLoading(true);
     setError(null);
     
     // Track that we're attempting OAuth login
     localStorage.setItem('oauth_attempt', JSON.stringify({
-      provider,
+      provider: selectedProvider,
       timestamp: Date.now(),
       page: 'login'
     }));
@@ -87,7 +100,7 @@ export default function Login() {
       console.log('OAuth redirect URL:', redirectTo);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: selectedProvider,
         options: { 
           redirectTo: redirectTo,
           queryParams: {
@@ -100,21 +113,21 @@ export default function Login() {
       if (error) {
         localStorage.removeItem('oauth_attempt'); // Clean up on error
         console.error('OAuth error:', error);
-        setError(`Failed to sign in with ${provider}. Please try again.`);
+        setError(`Failed to sign in with ${selectedProvider}. Please try again.`);
         setLoading(false);
         return;
       }
       
       // For mobile, show instructions
       if (window.Capacitor?.isNative) {
-        setError(`✅ ${provider} sign-in opened! After completing, switch back to MapBreak.`);
+        setError(`✅ ${selectedProvider} sign-in opened! After completing, switch back to MapBreak.`);
         setLoading(false);
       }
       
     } catch (err: any) {
       localStorage.removeItem('oauth_attempt'); // Clean up on error
       console.error('OAuth error:', err);
-      setError(`Failed to sign in with ${provider}. Please try again.`);
+      setError(`Failed to sign in with ${selectedProvider}. Please try again.`);
       setLoading(false);
     }
   };
@@ -197,7 +210,7 @@ export default function Login() {
 
           <div className="mt-6 space-y-4">
             <button
-              onClick={() => handleOAuthLogin('google')}
+              onClick={() => handleOAuthRequest('google')}
               disabled={loading}
               className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
@@ -211,7 +224,7 @@ export default function Login() {
             </button>
 
             <button
-              onClick={() => handleOAuthLogin('facebook')}
+              onClick={() => handleOAuthRequest('facebook')}
               disabled={loading}
               className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
             >
@@ -223,7 +236,7 @@ export default function Login() {
 
             {isIOS && (
               <button
-                onClick={() => handleOAuthLogin('apple')}
+                onClick={() => handleOAuthRequest('apple')}
                 disabled={loading}
                 className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
               >
@@ -327,34 +340,54 @@ export default function Login() {
                 </button>
               </p>
             </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Mobile Instructions */}
-            {window.Capacitor?.isNative && (
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
-                <div className="text-center">
-                  <p className="text-sm text-blue-800 dark:text-blue-300">
-                    📱 <strong>Mobile Sign In:</strong><br />
-                    After OAuth completes, switch back to MapBreak and you'll be automatically signed in!
-                  </p>
-                </div>
+      {/* OAuth Confirmation Modal */}
+      {showOAuthConfirm && selectedProvider && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/20 mb-4">
+                <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
               </div>
-            )}
-
-            {/* Debug Info (remove in production) */}
-            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                <strong>Debug Info:</strong>
-                <br />Loading: {loading ? 'Yes' : 'No'}
-                <br />Error: {error || 'None'}
-                <br />User: {user ? 'Authenticated ✅' : 'Not authenticated'}
-                <br />OAuth Attempted: {oauthAttempted ? 'Yes' : 'No'}
-                <br />Platform: {window.Capacitor?.isNative ? 'Mobile App' : 'Web Browser'}
-                <br />Domain: {window.location.hostname}
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Existing Account Required
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                You can only sign in with {selectedProvider} if you already have a MapBreak account linked to that {selectedProvider} account.
+                <br /><br />
+                <strong>If this is your first time:</strong> Please create an account first using the Sign Up page.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowOAuthConfirm(false);
+                    setSelectedProvider(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => navigate('/signup')}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Sign Up Instead
+                </button>
+                <button
+                  onClick={handleOAuthConfirmed}
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 flex items-center justify-center"
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Continue
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
