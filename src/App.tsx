@@ -1443,7 +1443,7 @@ const doShare = async () => {
   }
 };
   
-onst doFavorite = () => {
+const doFavorite = () => {
   console.log('❤️ Heart button clicked!');
   console.log('Current map:', currentMap?.name, 'ID:', currentMap?.id);
   console.log('Current favoriteMapIds:', favoriteMapIds);
