@@ -87,8 +87,8 @@ export function useStripe() {
   }, [createCheckoutSession]);
 
   return {
-    createCheckoutSession,
-    createSubscription, // Easy helper for your paywall
+    createCheckoutSession, // This is what your PaywallModal expects
+    createSubscription,
     isLoading,
     error,
   };

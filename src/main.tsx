@@ -10,8 +10,10 @@ import { StatusBar } from '@capacitor/status-bar';
     // ignore if running in a non-Capacitor/web context
   }
 })();
+
 import { createRoot } from 'react-dom/client';
 import { AppWrapper as App } from './App.tsx';
+import { SupabaseProvider } from './hooks/useSupabase'; // 🔥 ADD THIS IMPORT
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TextSizeProvider } from './contexts/TextSizeContext';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -19,12 +21,14 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LanguageProvider>
-      <ThemeProvider>
-        <TextSizeProvider>
-          <App />
-        </TextSizeProvider>
-      </ThemeProvider>
-    </LanguageProvider>
+    <SupabaseProvider> {/* 🔥 ADD THIS - Should be outermost for auth */}
+      <LanguageProvider>
+        <ThemeProvider>
+          <TextSizeProvider>
+            <App />
+          </TextSizeProvider>
+        </ThemeProvider>
+      </LanguageProvider>
+    </SupabaseProvider> {/* 🔥 CLOSE IT HERE */}
   </StrictMode>
 );
