@@ -1514,12 +1514,12 @@ const doFavorite = () => {
     return;
   }
   
-  if (!isSubscribed) {
-    console.log('❌ User not subscribed, showing paywall');
-    showShare('Subscription required for favorites');
-    setTimeout(() => setShowPaywall(true), 1500);
-    return;
-  }
+  //if (!isSubscribed) {
+  //console.log('❌ User not subscribed, showing paywall');
+  //showShare('Subscription required for favorites');
+  //setTimeout(() => setShowPaywall(true), 1500);
+  //return;
+  //}
   
   console.log('✅ Processing favorite for map:', currentMap.id);
   
