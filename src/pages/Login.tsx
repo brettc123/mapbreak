@@ -20,7 +20,7 @@ export default function Login() {
 }, [user, navigate, location.pathname]);
 
   // Listen for auth state changes
-  useEffect(() => {
+  /*useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', event, !!session);
       
@@ -32,7 +32,7 @@ export default function Login() {
 
     return () => subscription.unsubscribe();
   }, [supabase.auth, navigate]);
-
+*/
   const handleOAuthLogin = async (provider: 'google' | 'facebook' | 'apple') => {
     setLoading(true);
     setError(null);

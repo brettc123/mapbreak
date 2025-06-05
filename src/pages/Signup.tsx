@@ -26,7 +26,7 @@ export default function Signup() {
 }, [user, navigate, location.pathname]);
 
   // Listen for auth state changes
-  useEffect(() => {
+  /*useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', event, !!session);
       
@@ -38,7 +38,7 @@ export default function Signup() {
 
     return () => subscription.unsubscribe();
   }, [supabase.auth, navigate]);
-
+*/
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);

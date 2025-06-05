@@ -12,11 +12,11 @@ export default function AccountDetails() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Redirect if no user
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-    }
-  }, [user, navigate]);
+  //useEffect(() => {
+  //  if (!user) {
+  //    navigate('/login');
+  //  }
+  //}, [user, navigate]);
 
   if (!user) {
     return (
