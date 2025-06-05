@@ -206,12 +206,13 @@ function MapCard({
   className={`p-2 rounded-full bg-white/10 hover:bg-white/20 active:bg-red-500 active:scale-95 transition-all duration-150 ${!isSubscribed ? 'opacity-100': ''}`}
 >
   <Heart
-    className={`h-6 w-6 transition-all duration-200 ${
-      favoriteMapIds.includes(map.id)
-        ? 'fill-red-500 text-red-500 scale-110' // Filled red + slightly bigger when favorited
-        : 'text-compass-800 dark:text-white hover:text-red-400' // Empty heart, hover hint
-    } active:text-white`}
-  />
+  className={`h-6 w-6 transition-all duration-200 ${
+    // Only show filled heart if user is authenticated, subscribed, AND map is favorited
+    (isAuthenticated && isSubscribed && favoriteMapIds.includes(map.id))
+      ? 'fill-red-500 text-red-500 scale-110' 
+      : 'text-compass-800 dark:text-white hover:text-red-400'
+  } active:text-white`}
+/>
 </button>
             </div>
             <p className="text-compass-700 dark:text-gray-300 text-lg text-center mt-4">
@@ -1659,17 +1660,18 @@ const doFavorite = () => {
               </h2>
             </div>
             <MapCard
-              map={currentMap}
-              handleCoordinatesClick={() => window.open(`https://www.google.com/maps?q=${currentMap.coordinates.latitude},${currentMap.coordinates.longitude}`,'_blank')}
-              handleShare={doShare}
-              handleRandomMap={doRandom}
-              handleFavoriteClick={doFavorite}
-              handleTagClick={onTagClick}
-              favoriteMapIds={favoriteMapIds}
-              isSubscribed={isSubscribed}
-              isScrolled={isScrolled}
-              shareMessage={shareMessage}
-            />
+  map={currentMap}
+  handleCoordinatesClick={() => window.open(`https://www.google.com/maps?q=${currentMap.coordinates.latitude},${currentMap.coordinates.longitude}`,'_blank')}
+  handleShare={doShare}
+  handleRandomMap={doRandom}
+  handleFavoriteClick={doFavorite}
+  handleTagClick={onTagClick}
+  favoriteMapIds={favoriteMapIds}
+  isSubscribed={isSubscribed}
+  isAuthenticated={!!user}  // Add this prop
+  isScrolled={isScrolled}
+  shareMessage={shareMessage}
+/>
           </>
         )
       case 'search':

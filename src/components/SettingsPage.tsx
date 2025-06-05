@@ -14,9 +14,7 @@ import {
   ScrollText,
   Moon,
   Sun,
-  HelpCircle,
-  LogOut,
-  Trash2
+  HelpCircle
 } from 'lucide-react';
 import PaywallModal from './PaywallModal';
 
@@ -28,86 +26,9 @@ export default function SettingsPage() {
   const { currentLanguage } = useLanguage();
   
   const [showPaywall, setShowPaywall] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    if (loading) return;
-    
-    try {
-      setLoading(true);
-      setMessage(null);
-      
-      console.log('Logging out user...');
-      
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('Logout error:', error);
-        setMessage({ type: 'error', text: 'Failed to log out. Please try again.' });
-        return;
-      }
-      
-      console.log('Logout successful');
-      setMessage({ type: 'success', text: 'Logged out successfully!' });
-      
-      // Small delay before redirect to show success message
-      setTimeout(() => {
-        navigate('/', { replace: true });
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Logout error:', error);
-      setMessage({ type: 'error', text: 'Failed to log out. Please try again.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    if (loading) return;
-    
-    try {
-      setLoading(true);
-      setMessage(null);
-      
-      console.log('Attempting to delete account...');
-      
-      if (!user?.id) {
-        setMessage({ type: 'error', text: 'No user found to delete.' });
-        return;
-      }
-      
-      // Call the delete function - this typically just signs them out
-      // Real account deletion would need to be handled server-side
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('Account deletion error:', error);
-        setMessage({ type: 'error', text: 'Failed to delete account. Please try again.' });
-        return;
-      }
-      
-      console.log('Account deletion successful (user signed out)');
-      setMessage({ type: 'success', text: 'Account deleted successfully!' });
-      
-      // Close confirmation dialog
-      setShowDeleteConfirm(false);
-      
-      // Small delay before redirect
-      setTimeout(() => {
-        navigate('/', { replace: true });
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Account deletion error:', error);
-      setMessage({ type: 'error', text: 'Failed to delete account. Please try again.' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleRateApp = () => {
     if (window.location.href.includes('ios')) {
@@ -167,45 +88,6 @@ export default function SettingsPage() {
             <ChevronRight className="h-5 w-5 text-gray-400" />
           </button>
         </div>
-
-        {/* Auth Actions - Only show if user is logged in */}
-        {user && (
-          <>
-            {/* Logout */}
-            <div className="p-4">
-              <button
-                onClick={handleLogout}
-                disabled={loading}
-                className="w-full flex items-center justify-between text-left disabled:opacity-50"
-              >
-                <div className="flex items-center">
-                  <LogOut className="h-5 w-5 text-orange-500 mr-3" />
-                  <span className="text-slate dark:text-white font-medium">
-                    {loading ? 'Logging out...' : 'Log Out'}
-                  </span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-gray-400" />
-              </button>
-            </div>
-
-            {/* Delete Account */}
-            <div className="p-4">
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={loading}
-                className="w-full flex items-center justify-between text-left disabled:opacity-50"
-              >
-                <div className="flex items-center">
-                  <Trash2 className="h-5 w-5 text-red-500 mr-3" />
-                  <span className="text-red-600 dark:text-red-400 font-medium">
-                    Delete Account
-                  </span>
-                </div>
-                <ChevronRight className="h-5 w-5 text-gray-400" />
-              </button>
-            </div>
-          </>
-        )}
 
         {/* Language */}
         <div className="p-4">
@@ -361,35 +243,6 @@ export default function SettingsPage() {
               {message.type === 'success' ? '✅' : '❌'}
             </span>
             {message.text}
-          </div>
-        </div>
-      )}
-
-      {/* Delete Account Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-              Delete Account
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Are you sure you want to delete your account? This action cannot be undone and you will lose all your saved favorites.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={loading}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                {loading ? 'Deleting...' : 'Delete Account'}
-              </button>
-            </div>
           </div>
         </div>
       )}
