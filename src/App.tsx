@@ -1443,23 +1443,33 @@ const doShare = async () => {
   }
 };
   
-const doFavorite = () => {
+onst doFavorite = () => {
   console.log('❤️ Heart button clicked!');
   console.log('Current map:', currentMap?.name, 'ID:', currentMap?.id);
   console.log('Current favoriteMapIds:', favoriteMapIds);
   console.log('User:', !!user);
   console.log('Subscribed:', isSubscribed);
   
-  // TEMPORARY: Bypass login/subscription for testing
   if (!currentMap) {
     console.log('❌ No current map to favorite');
     showShare('No map to favorite');
     return;
   }
   
-  // TEMPORARY: Comment out auth checks for testing
-  // if (!user) return navigate('/login')
-  // if (!isSubscribed) return setShowPaywall(true)
+  // PROPER AUTH ENFORCEMENT - NO BYPASSING
+  if (!user) {
+    console.log('❌ User not authenticated, redirecting to login');
+    showShare('Please sign in to favorite maps');
+    setTimeout(() => navigate('/login'), 1500);
+    return;
+  }
+  
+  if (!isSubscribed) {
+    console.log('❌ User not subscribed, showing paywall');
+    showShare('Subscription required for favorites');
+    setTimeout(() => setShowPaywall(true), 1500);
+    return;
+  }
   
   console.log('✅ Processing favorite for map:', currentMap.id);
   
@@ -1477,7 +1487,6 @@ const doFavorite = () => {
   console.log('Was already favorited:', wasAlreadyFavorited);
   
   // CRITICAL: Make sure current map is available to favorites screen
-  // Add current map to global tracker
   if (window.__mapTracker && currentMap) {
     window.__mapTracker.mapsById[currentMap.id] = currentMap;
     window.__mapTracker.allSeen = Object.values(window.__mapTracker.mapsById);
@@ -1501,57 +1510,6 @@ const doFavorite = () => {
   setTimeout(() => {
     console.log('Updated favoriteMapIds after toggle:', favoriteMapIds);
   }, 100);
-};
-  
- const doRandom = async () => {
-  console.log('🎲 Random button clicked!')
-  
-  // IMMEDIATE FEEDBACK
-  showShare('Loading random map...')
-  
-  // HAPTIC FEEDBACK
-  try {
-    if (window.Capacitor?.isNative) {
-      await Haptics.impact({ style: ImpactStyle.Light })
-    }
-  } catch (e) {
-    console.log('Haptics not available')
-  }
-  
-  try {
-    if (typeof getRandomMap === 'function') {
-      console.log('Calling getRandomMap...')
-      await getRandomMap()
-      
-      // SCROLL TO TOP after new map loads
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-      
-      // SUCCESS FEEDBACK
-      showShare('✅ New random map loaded!')
-      console.log('✅ Random map loaded successfully')
-      
-      // SUCCESS HAPTIC
-      try {
-        if (window.Capacitor?.isNative) {
-          await Haptics.impact({ style: ImpactStyle.Medium })
-        }
-      } catch (e) {}
-      
-    } else {
-      console.error('❌ getRandomMap function not found!')
-      showShare('❌ Random map not available')
-    }
-  } catch (error) {
-    console.error('❌ Error loading random map:', error)
-    showShare('❌ Failed to load random map')
-    
-    // ERROR HAPTIC
-    try {
-      if (window.Capacitor?.isNative) {
-        await Haptics.impact({ style: ImpactStyle.Heavy })
-      }
-    } catch (e) {}
-  }
 };
   
   // UPDATED: Add navigation source tracking
@@ -1687,37 +1645,72 @@ const doFavorite = () => {
           />
         )
       case 'favorites':
-        console.log('🔍 FAVORITES TAB - Starting render');
-        console.log('🔍 Props for FavoritesScreen:', {
-          favoriteMapIds,
-          archiveMaps: archiveMaps?.length,
-          user: !!user,
-          isSubscribed
-        });
-        
-        return (
-          <>
-            <MobileHeader title="Favorites" />
-            <div className="hidden md:flex items-center px-4 py-3 border-b bg-white dark:bg-gray-800">
-              <h2 className="text-2xl font-display font-bold text-compass-800 dark:text-white">
-                Favorites
-              </h2>
-            </div>
-            
-            <FavoritesScreen
-              favorites={favoriteMapIds}
-              archiveMaps={archiveMaps}
-              onSelect={(m: any) => { 
-                console.log('🔍 Favorite selected:', m.name);
-                setCurrentMap(m); 
-                setNavigationSource('map-selection');
-                setActiveTab('maps');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onTagClick={onTagClick}
-            />
-          </>
-        )
+  console.log('🔍 FAVORITES TAB - Starting render');
+  console.log('🔍 Props for FavoritesScreen:', {
+    favoriteMapIds,
+    archiveMaps: archiveMaps?.length,
+    user: !!user,
+    isSubscribed
+  });
+  
+  return (
+    <>
+      <MobileHeader title="Favorites" />
+      <div className="hidden md:flex items-center px-4 py-3 border-b bg-white dark:bg-gray-800">
+        <h2 className="text-2xl font-display font-bold text-compass-800 dark:text-white">
+          Favorites
+        </h2>
+      </div>
+      
+      {/* AUTH & SUBSCRIPTION CHECK */}
+      {!user ? (
+        <div className="pt-[calc(env(safe-area-inset-top)+3rem)] md:pt-0 px-4 pb-32 min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <UserIcon className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Sign In Required</h2>
+            <p className="text-gray-600 dark:text-gray-400 text-lg mb-6">
+              Please sign in to access your favorite maps.
+            </p>
+            <button
+              onClick={() => navigate('/login')}
+              className="px-6 py-3 bg-terra text-white rounded-lg font-semibold hover:bg-terra/90 transition-colors"
+            >
+              Sign In
+            </button>
+          </div>
+        </div>
+      ) : !isSubscribed ? (
+        <div className="pt-[calc(env(safe-area-inset-top)+3rem)] md:pt-0 px-4 pb-32 min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <StarIcon className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">Premium Required</h2>
+            <p className="text-gray-600 dark:text-gray-400 text-lg mb-6">
+              Upgrade to Premium to save and access your favorite maps.
+            </p>
+            <button
+              onClick={() => setShowPaywall(true)}
+              className="px-6 py-3 bg-terra text-white rounded-lg font-semibold hover:bg-terra/90 transition-colors"
+            >
+              Upgrade to Premium
+            </button>
+          </div>
+        </div>
+      ) : (
+        <FavoritesScreen
+          favorites={favoriteMapIds}
+          archiveMaps={archiveMaps}
+          onSelect={(m: any) => { 
+            console.log('🔍 Favorite selected:', m.name);
+            setCurrentMap(m); 
+            setNavigationSource('map-selection');
+            setActiveTab('maps');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onTagClick={onTagClick}
+        />
+      )}
+    </>
+  )
       case 'settings':
         return (
           <>

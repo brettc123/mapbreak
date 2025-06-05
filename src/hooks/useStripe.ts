@@ -72,8 +72,23 @@ export function useStripe() {
     [supabase, navigate],
   );
 
+  // Add a helper function for the subscription flow
+  const createSubscription = useCallback(async () => {
+    const priceId = import.meta.env.VITE_STRIPE_PRICE_ID;
+    
+    if (!priceId) {
+      throw new Error('Stripe price ID not configured. Please add VITE_STRIPE_PRICE_ID to your environment variables.');
+    }
+
+    return createCheckoutSession({
+      priceId,
+      mode: 'subscription',
+    });
+  }, [createCheckoutSession]);
+
   return {
     createCheckoutSession,
+    createSubscription, // Easy helper for your paywall
     isLoading,
     error,
   };

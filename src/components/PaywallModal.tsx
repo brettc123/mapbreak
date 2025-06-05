@@ -1,5 +1,4 @@
 import { X } from 'lucide-react';
-import { STRIPE_PRODUCTS } from '../stripe-config';
 import { useStripe } from '../hooks/useStripe';
 import { useState } from 'react';
 import { useSupabase } from '../hooks/useSupabase';
@@ -33,10 +32,21 @@ export default function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
         return;
       }
 
+      // Get price ID from environment variable
+      const priceId = import.meta.env.VITE_STRIPE_PRICE_ID;
+      
+      if (!priceId) {
+        setError('Subscription not configured. Please contact support.');
+        console.error('VITE_STRIPE_PRICE_ID not found in environment variables');
+        return;
+      }
+
+      // Use your existing createCheckoutSession function
       await createCheckoutSession({
-        priceId: STRIPE_PRODUCTS.MAPBREAK_SUBSCRIPTION.priceId,
+        priceId: priceId,
         mode: 'subscription',
       });
+      
     } catch (err: any) {
       setError(err.message);
       console.error('Subscription error:', err);
@@ -77,22 +87,36 @@ export default function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
                   <span className="text-sage mr-3 text-xl">✓</span>
                   Premium support
                 </li>
+                <li className="flex items-center text-slate/80 dark:text-gray-300">
+                  <span className="text-sage mr-3 text-xl">✓</span>
+                  Early access to new features
+                </li>
               </ul>
             </div>
             
             {error && (
-              <div className="text-red-600 bg-red-50 dark:bg-red-900/50 dark:text-red-400 p-4 rounded-lg text-sm">
-                {error}
+              <div className="text-red-600 bg-red-50 dark:bg-red-900/50 dark:text-red-400 p-4 rounded-lg text-sm border border-red-200 dark:border-red-700">
+                <div className="flex items-start">
+                  <span className="mr-2 flex-shrink-0">⚠️</span>
+                  <span>{error}</span>
+                </div>
               </div>
             )}
             
             <button
               onClick={handleSubscribe}
               disabled={isLoading}
-              className="w-full bg-terra text-white py-4 px-6 rounded-lg text-lg font-semibold hover:bg-terra/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-terra disabled:opacity-50 transition-colors"
+              className="w-full bg-terra text-white py-4 px-6 rounded-lg text-lg font-semibold hover:bg-terra/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-terra disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isLoading ? 'Processing...' : 'Subscribe Now'}
             </button>
+            
+            {/* Optional: Add pricing info */}
+            <div className="text-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Cancel anytime. No commitment required.
+              </p>
+            </div>
           </div>
         </div>
       </div>
