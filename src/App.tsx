@@ -1442,7 +1442,56 @@ const doShare = async () => {
     } catch (e) {}
   }
 };
+const doRandom = async () => {
+  console.log('🎲 Random button clicked!')
   
+  // IMMEDIATE FEEDBACK
+  showShare('Loading random map...')
+  
+  // HAPTIC FEEDBACK
+  try {
+    if (window.Capacitor?.isNative) {
+      await Haptics.impact({ style: ImpactStyle.Light })
+    }
+  } catch (e) {
+    console.log('Haptics not available')
+  }
+  
+  try {
+    if (typeof getRandomMap === 'function') {
+      console.log('Calling getRandomMap...')
+      await getRandomMap()
+      
+      // SCROLL TO TOP after new map loads
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      
+      // SUCCESS FEEDBACK
+      showShare('✅ New random map loaded!')
+      console.log('✅ Random map loaded successfully')
+      
+      // SUCCESS HAPTIC
+      try {
+        if (window.Capacitor?.isNative) {
+          await Haptics.impact({ style: ImpactStyle.Medium })
+        }
+      } catch (e) {}
+      
+    } else {
+      console.error('❌ getRandomMap function not found!')
+      showShare('❌ Random map not available')
+    }
+  } catch (error) {
+    console.error('❌ Error loading random map:', error)
+    showShare('❌ Failed to load random map')
+    
+    // ERROR HAPTIC
+    try {
+      if (window.Capacitor?.isNative) {
+        await Haptics.impact({ style: ImpactStyle.Heavy })
+      }
+    } catch (e) {}
+  }
+};
 const doFavorite = () => {
   console.log('❤️ Heart button clicked!');
   console.log('Current map:', currentMap?.name, 'ID:', currentMap?.id);
