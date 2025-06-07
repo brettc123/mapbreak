@@ -14,21 +14,4 @@ export default defineConfig({
     exclude: ['lucide-react'],
     include: ['react-map-gl', 'maplibre-gl']
   },
-  
-  // ADD THESE CSS FIXES FOR MOBILE
-  build: {
-    // Keep CSS together for mobile builds
-    cssCodeSplit: false,
-    rollupOptions: {
-      output: {
-        // Ensure CSS is properly bundled
-        manualChunks: undefined,
-      }
-    }
-  },
-  
-  // Ensure PostCSS/Tailwind is processed correctly
-  css: {
-    postcss: './postcss.config.js'
-  }
 });

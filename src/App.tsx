@@ -13,7 +13,6 @@ import { documentToReactComponents } from '@contentful/rich-text-react-renderer'
 import { BLOCKS, MARKS } from '@contentful/rich-text-types'
 
 import Login from './pages/Login'
-import SimpleTestLogin from './pages/SimpleTestLogin'
 import Signup from './pages/Signup'
 import Success from './pages/Success'
 import Cancel from './pages/Cancel'

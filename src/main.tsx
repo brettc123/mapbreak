@@ -21,7 +21,7 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <SupabaseProvider> {/* 🔥 ADD THIS - Should be outermost for auth */}
+    <SupabaseProvider> {/* 🔥 ADD THIS - Should be outermost for auth /}
       <LanguageProvider>
         <ThemeProvider>
           <TextSizeProvider>
@@ -29,6 +29,6 @@ createRoot(document.getElementById('root')!).render(
           </TextSizeProvider>
         </ThemeProvider>
       </LanguageProvider>
-    </SupabaseProvider> {/* 🔥 CLOSE IT HERE */}
+    </SupabaseProvider> {/ 🔥 CLOSE IT HERE */}
   </StrictMode>
 );
