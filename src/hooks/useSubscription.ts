@@ -1,7 +1,7 @@
 // hooks/useSubscription.ts
-// Simplified for monthly/yearly pricing
+// Fixed version to prevent multiple subscription errors
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSupabase } from './useSupabase';
 
 interface Subscription {
@@ -24,6 +24,10 @@ export function useSubscription() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use refs to track subscription state and prevent multiple subscriptions
+  const subscriptionChannelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -75,44 +79,90 @@ export function useSubscription() {
       }
     };
 
-    fetchSubscription();
+    // Set up real-time subscription only if not already subscribed
+    const setupRealtimeSubscription = () => {
+      // Cleanup existing subscription first
+      if (subscriptionChannelRef.current) {
+        console.log('🧹 Cleaning up existing subscription channel');
+        subscriptionChannelRef.current.unsubscribe();
+        subscriptionChannelRef.current = null;
+        isSubscribedRef.current = false;
+      }
 
-    // Real-time subscription changes
-    const subscriptionChannel = supabase
-      .channel('subscription-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'stripe_subscriptions',
-          filter: `user_id=eq.${user?.id}`,
-        },
-        (payload) => {
-          console.log('Subscription changed:', payload);
+      // Only create new subscription if user exists and we haven't already subscribed
+      if (user && !isSubscribedRef.current) {
+        console.log('🔄 Setting up subscription channel for user:', user.id);
+        
+        try {
+          // Create a unique channel name to avoid conflicts
+          const channelName = `subscription-changes-${user.id}-${Date.now()}`;
           
-          if (payload.eventType === 'DELETE') {
-            setSubscription({
-              id: 'free',
-              user_id: user?.id || '',
-              customer_id: '',
-              subscription_status: 'free',
+          subscriptionChannelRef.current = supabase
+            .channel(channelName)
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'stripe_subscriptions',
+                filter: `user_id=eq.${user.id}`,
+              },
+              (payload) => {
+                console.log('📡 Subscription changed:', payload);
+                
+                if (!mounted) return;
+                
+                if (payload.eventType === 'DELETE') {
+                  setSubscription({
+                    id: 'free',
+                    user_id: user.id,
+                    customer_id: '',
+                    subscription_status: 'free',
+                  });
+                } else if (payload.new) {
+                  const newSubscription = payload.new as Subscription;
+                  if (['active', 'trialing'].includes(newSubscription.subscription_status)) {
+                    setSubscription(newSubscription);
+                  }
+                }
+              }
+            )
+            .subscribe((status) => {
+              console.log('📡 Subscription status:', status);
+              if (status === 'SUBSCRIBED') {
+                isSubscribedRef.current = true;
+                console.log('✅ Successfully subscribed to subscription changes');
+              } else if (status === 'CHANNEL_ERROR') {
+                console.error('❌ Error subscribing to subscription changes');
+                isSubscribedRef.current = false;
+              }
             });
-          } else if (payload.new) {
-            const newSubscription = payload.new as Subscription;
-            if (['active', 'trialing'].includes(newSubscription.subscription_status)) {
-              setSubscription(newSubscription);
-            }
-          }
+            
+        } catch (error) {
+          console.error('❌ Error setting up realtime subscription:', error);
         }
-      )
-      .subscribe();
+      }
+    };
+
+    // Fetch initial subscription data
+    fetchSubscription().then(() => {
+      if (mounted) {
+        setupRealtimeSubscription();
+      }
+    });
 
     return () => {
       mounted = false;
-      subscriptionChannel.unsubscribe();
+      
+      // Cleanup subscription
+      if (subscriptionChannelRef.current) {
+        console.log('🧹 Cleaning up subscription channel on unmount');
+        subscriptionChannelRef.current.unsubscribe();
+        subscriptionChannelRef.current = null;
+        isSubscribedRef.current = false;
+      }
     };
-  }, [user, supabase]);
+  }, [user?.id, supabase]); // Only depend on user ID to prevent unnecessary re-subscriptions
 
   // Helper computed values
   const isSubscribed = subscription?.subscription_status === 'active';

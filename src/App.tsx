@@ -13,6 +13,7 @@ import { documentToReactComponents } from '@contentful/rich-text-react-renderer'
 import { BLOCKS, MARKS } from '@contentful/rich-text-types'
 
 import Login from './pages/Login'
+import DiagnosticLogin from './pages/DiagnosticLogin'
 import Signup from './pages/Signup'
 import Success from './pages/Success'
 import Cancel from './pages/Cancel'
@@ -2024,7 +2025,7 @@ function AppRoutes() {
 
   return (
      <Routes>
-      <Route path="/login" element={<Login />} />
+     <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/success" element={<Success />} />
       <Route path="/cancel" element={<Cancel />} />
